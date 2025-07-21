@@ -2,9 +2,8 @@
 
 DocuQuery is a full-stack web application that allows you to ask questions about your own documents (`.pdf`, `.docx`, `.txt`) and get answers from a locally-run AI model. It uses a Retrieval-Augmented Generation (RAG) pipeline to ensure answers are based *only* on the content of your uploaded file, guaranteeing data privacy.
 
-**Live Demo:** [docuquery-your-name.onrender.com](https://docuquery-your-name.onrender.com)
+**Live Demo:** [docuquery-shayaanansari.onrender.co](https://docuquery-secure-rag-document-q-a.onrender.com)
 
-![DocuQuery UI](https://placehold.co/800x400/1e293b/e2e8f0?text=DocuQuery%20Interface)
 
 ### Key Features
 
@@ -23,6 +22,7 @@ DocuQuery is a full-stack web application that allows you to ask questions about
 -- **Deployment:** Docker, Render
 
 ### How to Run Locally
+
 
 1.  **Clone the repository:**
     ```bash
