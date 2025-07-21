@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Report: The DocuQuery RAG System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 50vh;
+        }
+        .step-connector {
+            position: absolute;
+            top: 2rem;
+            left: 50%;
+            height: calc(100% - 2rem);
+            border-left: 2px dashed #9ca3af;
+            z-index: 0;
+        }
+        .step-content {
+            transition: all 0.4s ease-in-out;
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+        }
+        .step-content.active {
+            max-height: 500px;
+            opacity: 1;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 4px solid #34495e;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* Blinking cursor effect for streaming text */
+        .blinking-cursor::after {
+            content: '▋';
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-stone-50 text-stone-800">
+
+    <div class="max-w-5xl mx-auto p-4 md:p-8">
+
+        <header class="text-center py-12">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-slate-800">Docu<span class="text-slate-500">Query</span></h1>
+            <p class="mt-4 text-lg text-stone-600">An Interactive Exploration of a Secure RAG System</p>
+        </header>
+
+        <section id="introduction" class="mb-24 text-center">
+            <h2 class="text-3xl font-bold mb-4 text-slate-800">What is DocuQuery?</h2>
+            <p class="max-w-3xl mx-auto text-stone-700 leading-relaxed mb-12">
+                DocuQuery is a powerful proof-of-concept application that demonstrates a secure, private search engine for your documents. Instead of relying on external AI services, it uses a self-contained pipeline called Retrieval-Augmented Generation (RAG) to understand your documents and answer questions based *only* on the information provided. This report interactively deconstructs the entire process, from file upload to final answer.
+            </p>
+            <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 p-6 bg-white rounded-xl shadow-lg border border-stone-200">
+                <div class="text-2xl font-bold">📄<br/>Your Doc</div>
+                <div class="text-4xl text-slate-400 font-light transform md:-rotate-0 rotate-90">→</div>
+                <div class="p-4 bg-slate-800 text-white rounded-lg shadow-inner">
+                    <span class="font-mono font-bold">RAG Pipeline</span>
+                </div>
+                <div class="text-4xl text-slate-400 font-light transform md:-rotate-0 rotate-90">→</div>
+                <div class="text-2xl font-bold">💬<br/>Precise Answer</div>
+            </div>
+        </section>
+
+        <section id="live-demo" class="mb-24">
+            <h2 class="text-3xl font-bold text-center mb-4 text-slate-800">Try It Live</h2>
+            <p class="max-w-3xl mx-auto text-center text-stone-700 leading-relaxed mb-12">
+                Upload a document and ask a question about its contents. The entire process runs locally in your browser and on the server—your data is never shared.
+            </p>
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-stone-200">
+                <form id="rag-form">
+                    <div class="mb-6">
+                        <label for="document" class="block mb-2 text-lg font-medium text-slate-800">1. Upload your Document (PDF, DOCX, TXT)</label>
+                        <input type="file" name="document" id="document" accept=".pdf,.docx,.txt" class="block w-full text-sm text-stone-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="question" class="block mb-2 text-lg font-medium text-slate-800">2. Ask a Question</label>
+                        <input type="text" name="question" id="question" class="bg-stone-100 border border-stone-300 text-stone-900 text-sm rounded-lg focus:ring-slate-500 focus:border-slate-500 block w-full p-4" placeholder="e.g., What were the main findings of the report?" required>
+                    </div>
+                    <div class="text-center">
+                        <button type="submit" id="submit-button" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-lg transition-transform duration-200 active:scale-95 w-full md:w-auto">
+                            Ask DocuQuery
+                        </button>
+                    </div>
+                </form>
+                <div id="result-container" class="mt-8">
+                    <div id="loader" class="loader mx-auto hidden"></div>
+                    <div id="answer" class="text-stone-700 bg-stone-100 p-6 rounded-lg border border-stone-200 whitespace-pre-wrap hidden"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="pipeline" class="mb-24">
+            <h2 class="text-3xl font-bold text-center mb-4 text-slate-800">How It Works: The RAG Pipeline</h2>
+            <p class="max-w-3xl mx-auto text-center text-stone-700 leading-relaxed mb-16">
+                The core of DocuQuery is its two-phase pipeline. The first phase, **Ingestion**, prepares your document for search. The second phase, **Inference**, uses that preparation to answer your questions. Click on each step below to reveal the technologies and processes involved.
+            </p>
+            <div class="relative">
+                <div class="relative p-8 mb-8 bg-white border border-stone-200 rounded-xl shadow-lg">
+                    <div class="step-connector hidden md:block"></div>
+                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleStep('ingestion')">
+                        <div>
+                            <span class="text-sm font-semibold text-slate-500">PHASE 1</span>
+                            <h3 class="text-2xl font-bold text-slate-800">Ingestion: Preparing the Document</h3>
+                        </div>
+                        <div id="ingestion-arrow" class="transform transition-transform text-3xl text-slate-400">›</div>
+                    </div>
+                    <div id="ingestion" class="step-content mt-6">
+                        <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                            <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">📄</div><h4 class="font-bold">1. Load</h4><p class="text-sm text-stone-600">The system reads text using loaders for PDF, DOCX, and TXT files.</p>
+                            </div>
+                            <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">✂️</div><h4 class="font-bold">2. Split</h4><p class="text-sm text-stone-600">Text is broken into small, overlapping chunks with <code class="bg-stone-200 px-1 rounded">RecursiveCharacterTextSplitter</code>.</p>
+                            </div>
+                            <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">🔢</div><h4 class="font-bold">3. Embed</h4><p class="text-sm text-stone-600">Each chunk is converted into a numerical vector (embedding) representing its meaning, using <code class="bg-stone-200 px-1 rounded">SentenceTransformers</code>.</p>
+                            </div>
+                             <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">🗂️</div><h4 class="font-bold">4. Index</h4><p class="text-sm text-stone-600">These vectors are stored in a highly-efficient, searchable <code class="bg-stone-200 px-1 rounded">FAISS</code> vector store, ready for querying.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="relative p-8 bg-white border border-stone-200 rounded-xl shadow-lg">
+                    <div class="flex items-center justify-between cursor-pointer" onclick="toggleStep('inference')">
+                        <div>
+                            <span class="text-sm font-semibold text-slate-500">PHASE 2</span>
+                            <h3 class="text-2xl font-bold text-slate-800">Inference: Answering a Question</h3>
+                        </div>
+                         <div id="inference-arrow" class="transform transition-transform text-3xl text-slate-400">›</div>
+                    </div>
+                    <div id="inference" class="step-content mt-6">
+                         <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                            <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">❓</div><h4 class="font-bold">1. Query</h4><p class="text-sm text-stone-600">Your question is also converted into a numerical vector using the same embedding model.</p>
+                            </div>
+                            <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">🎯</div><h4 class="font-bold">2. Retrieve</h4><p class="text-sm text-stone-600">The system performs a similarity search in FAISS to find the text chunks most relevant to your question's vector.</p>
+                            </div>
+                            <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">✍️</div><h4 class="font-bold">3. Augment</h4><p class="text-sm text-stone-600">The relevant chunks (context) and your question are combined into a detailed prompt for the LLM.</p>
+                            </div>
+                             <div class="p-4 bg-stone-100 rounded-lg">
+                                <div class="text-3xl mb-2">💡</div><h4 class="font-bold">4. Generate</h4><p class="text-sm text-stone-600">The LLM generates a final answer based *only* on the provided context, ensuring security and accuracy.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="visualization" class="mb-24">
+             <h2 class="text-3xl font-bold text-center mb-4 text-slate-800">Visualizing Similarity Search</h2>
+            <p class="max-w-3xl mx-auto text-center text-stone-700 leading-relaxed mb-12">
+                The "magic" of a RAG system happens during the "Retrieve" step. The system isn't searching for keywords; it's searching for *meaning*. This chart represents the document's text chunks as blue dots in a 2D vector space. Click the button to simulate asking a question and see how the system instantly finds the most contextually relevant information.
+            </p>
+            <div class="bg-white p-6 rounded-xl shadow-lg border border-stone-200">
+                <div class="chart-container">
+                    <canvas id="similarityChart"></canvas>
+                </div>
+                <div class="text-center mt-6">
+                    <button id="simulateQueryBtn" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-8 rounded-lg transition-transform duration-200 active:scale-95">
+                        Simulate a Query
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="tech-stack" class="mb-24">
+            <h2 class="text-3xl font-bold text-center mb-4 text-slate-800">Technology Stack</h2>
+            <p class="max-w-3xl mx-auto text-center text-stone-700 leading-relaxed mb-12">
+                This application is built on a foundation of powerful, open-source tools. Each component plays a critical role in the final architecture, from the web interface to the core AI logic.
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">Flask</h3><p class="text-sm text-stone-600">Backend web framework</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">LangChain</h3><p class="text-sm text-stone-600">AI pipeline orchestration</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">FAISS</h3><p class="text-sm text-stone-600">Vector similarity search</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">SentenceTransformers</h3><p class="text-sm text-stone-600">Text embedding models</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">PyMuPDF/Docx2txt</h3><p class="text-sm text-stone-600">Multi-format loaders</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">Tailwind CSS</h3><p class="text-sm text-stone-600">Frontend styling</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">Chart.js</h3><p class="text-sm text-stone-600">Data visualization</p></div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200 text-center"><h3 class="font-bold">JavaScript</h3><p class="text-sm text-stone-600">Client-side interactivity</p></div>
+            </div>
+        </section>
+        
+        <section id="benefits">
+             <h2 class="text-3xl font-bold text-center mb-4 text-slate-800">Key Benefits & Takeaways</h2>
+            <p class="max-w-3xl mx-auto text-center text-stone-700 leading-relaxed mb-12">
+               The RAG architecture provides significant advantages over traditional search or general-purpose AI models, especially for enterprise and personal use cases where data privacy is paramount.
+            </p>
+             <div class="grid md:grid-cols-2 gap-8">
+                <div class="bg-white p-6 rounded-lg border border-stone-200">
+                    <h3 class="text-xl font-bold mb-2">🔒 Security & Privacy</h3>
+                    <p class="text-stone-600">Since the entire process runs locally and only uses the uploaded document as its knowledge base, your data never leaves your control. There is no risk of leaking sensitive information to third-party AI providers.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg border border-stone-200">
+                    <h3 class="text-xl font-bold mb-2">🎯 Accuracy & Relevance</h3>
+                    <p class="text-stone-600">Answers are strictly "grounded" in the provided context. This drastically reduces the risk of the AI "hallucinating" or making up incorrect information, as it can only use the facts present in your document.</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg border border-stone-200">
+                    <h3 class="text-xl font-bold mb-2">⚡ Speed & Efficiency</h3>
+                    <p class="text-stone-600">By pre-processing documents into an optimized vector store, the system can retrieve relevant information almost instantly, even from large documents. The heavy lifting is done once during ingestion.</p>
+                </div>
+                 <div class="bg-white p-6 rounded-lg border border-stone-200">
+                    <h3 class="text-xl font-bold mb-2">🔧 Extensibility</h3>
+                    <p class="text-stone-600">The modular nature of the pipeline allows for easy customization. You can swap out embedding models, vector stores, or LLMs to suit different performance needs and use cases without rebuilding the entire system.</p>
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <script>
+        document.getElementById('rag-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const form = e.target;
+            const formData = new FormData(form);
+            const submitButton = document.getElementById('submit-button');
+            const loader = document.getElementById('loader');
+            const answerDiv = document.getElementById('answer');
+
+            loader.classList.remove('hidden');
+            answerDiv.classList.add('hidden');
+            answerDiv.textContent = '';
+            answerDiv.style.color = 'inherit';
+            submitButton.disabled = true;
+            submitButton.textContent = 'Processing...';
+
+            try {
+                const response = await fetch('/process', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                answerDiv.classList.remove('hidden');
+                loader.classList.add('hidden');
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Server error: ${errorText}`);
+                }
+
+                answerDiv.classList.add('blinking-cursor');
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        answerDiv.classList.remove('blinking-cursor');
+                        break;
+                    }
+                    const chunk = decoder.decode(value, { stream: true });
+                    answerDiv.textContent += chunk;
+                }
+
+            } catch (error) {
+                loader.classList.add('hidden');
+                answerDiv.classList.remove('hidden');
+                answerDiv.textContent = `Error: ${error.message}`;
+                answerDiv.style.color = 'red';
+                console.error('Fetch error:', error);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Ask DocuQuery';
+            }
+        });
+
+        let similarityChart;
+
+        function toggleStep(stepId) {
+            const content = document.getElementById(stepId);
+            const arrow = document.getElementById(`${stepId}-arrow`);
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                arrow.style.transform = 'rotate(0deg)';
+            } else {
+                content.classList.add('active');
+                arrow.style.transform = 'rotate(90deg)';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const ctx = document.getElementById('similarityChart').getContext('2d');
+            
+            const documentChunks = Array.from({ length: 50 }, () => ({
+                x: Math.random() * 100,
+                y: Math.random() * 100,
+            }));
+
+            const chartConfig = {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Document Chunks',
+                        data: documentChunks,
+                        backgroundColor: 'rgba(51, 65, 85, 0.5)',
+                        borderColor: 'rgba(51, 65, 85, 1)',
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                    }, {
+                        label: 'Your Query',
+                        data: [],
+                        backgroundColor: 'rgba(34, 197, 94, 1)',
+                        borderColor: 'rgba(22, 163, 74, 1)',
+                        pointRadius: 10,
+                        pointHoverRadius: 12,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: false,
+                            min: 0,
+                            max: 100
+                        },
+                        y: {
+                            display: false,
+                             min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            };
+
+            similarityChart = new Chart(ctx, chartConfig);
+
+            const simulateBtn = document.getElementById('simulateQueryBtn');
+            simulateBtn.addEventListener('click', () => {
+                const queryPoint = {
+                    x: Math.random() * 100,
+                    y: Math.random() * 100,
+                };
+                
+                similarityChart.data.datasets[1].data = [queryPoint];
+
+                const distances = documentChunks.map((chunk, index) => {
+                    const dist = Math.sqrt(Math.pow(chunk.x - queryPoint.x, 2) + Math.pow(chunk.y - queryPoint.y, 2));
+                    return { index, dist };
+                });
+                
+                distances.sort((a, b) => a.dist - b.dist);
+                const nearestIndices = distances.slice(0, 3).map(d => d.index);
+
+                const newBackgroundColors = documentChunks.map((_, index) => {
+                    return nearestIndices.includes(index) ? 'rgba(59, 130, 246, 1)' : 'rgba(51, 65, 85, 0.5)';
+                });
+                
+                 const newRadii = documentChunks.map((_, index) => {
+                    return nearestIndices.includes(index) ? 9 : 6;
+                });
+
+                similarityChart.data.datasets[0].backgroundColor = newBackgroundColors;
+                similarityChart.data.datasets[0].pointRadius = newRadii;
+                
+                similarityChart.update();
+            });
+        });
+    </script>
+</body>
+</html>

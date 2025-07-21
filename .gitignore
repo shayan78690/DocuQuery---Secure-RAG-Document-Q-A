@@ -1,0 +1,34 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE and editor directories
+.idea/
+.vscode/
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Local storage and temporary files
+uploads/
+persistent_storage/
+
+# Local environment variables
+.env
+
+# Docker-related
+# (No need to ignore Dockerfile or .dockerignore itself)
+
+# Log files
+*.log
+
+llm_model/
